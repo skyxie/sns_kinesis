@@ -27,7 +27,7 @@ function _write(kinesis, record, callback) {
   });
 }
 
-exports.handler = (event, context, callback) => {
+function main(event, context) {
   const kinesis = new AWS.Kinesis({region : 'us-east-1'});
 
   Async.parallel(
@@ -45,3 +45,5 @@ exports.handler = (event, context, callback) => {
     }
   );
 };
+
+exports.handler = main;
