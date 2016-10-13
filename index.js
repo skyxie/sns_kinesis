@@ -58,7 +58,8 @@ function main(event, context) {
     // Known event sources:
     // aws:sns => sns
     // aws:kinesis => kinesis
-    let created = new Date((src.indexOf('sns') >= 0) ? record.Sns.Message : record.kinesis.data);
+    let timestamp = parseInt((src.indexOf('sns') >= 0) ? record.Sns.Message : record.kinesis.data);
+    let created = new Date(timestamp);
 
     let latency = created.getUTCMilliseconds() - invoked.getUTCMilliseconds();
 
