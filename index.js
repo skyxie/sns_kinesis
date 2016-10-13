@@ -27,7 +27,7 @@ function _write(kinesis, record, callback) {
   });
 }
 
-function main(event, context) {
+function snsKinesis(event, context) {
   const kinesis = new AWS.Kinesis({region : 'us-east-1'});
 
   Async.parallel(
@@ -44,6 +44,33 @@ function main(event, context) {
       }
     }
   );
-};
+}
+
+// Measure time between message published to SNS and time invoked on lambda
+function main(event, context) {
+  let invoked = new Date();
+
+  let stats = event.Records.map((record) => {
+    let src = record.EventSource;
+
+    // Known event sources:
+    // aws:sns => sns
+    // aws:kinesis => kinesis
+    let created = new Date((src.indexOf('sns') >= 0) ? record.Sns.Message : record.kinesis.data);
+
+    let latency = created.getUTCMilliseconds() - invoked.getUTCMilliseconds();
+
+    console.log(
+      'Received event from '+src+
+      ' created at '+created.toString()+
+      ' invoked at '+invoked.toString()+
+      ' with latency '+latency+"ms"
+    );
+
+    return [src, created, invoked, latency];
+  });
+
+  context.succeed();
+}
 
 exports.handler = main;
