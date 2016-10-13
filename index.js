@@ -51,6 +51,8 @@ function main(event, context) {
   let invoked = new Date();
 
   let stats = event.Records.map((record) => {
+    console.log(JSON.stringify(record, null, 2));
+
     let src = record.EventSource;
 
     // Known event sources:
