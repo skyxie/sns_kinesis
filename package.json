@@ -2,7 +2,7 @@
   "name": "sns-kinesis",
   "version": "0.0.1",
   "dependencies": {
-    "async" : "*",
+    "promise" : "*",
     "aws-sdk" : "2.2.12"
   }
 }

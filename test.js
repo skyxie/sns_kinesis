@@ -1,23 +1,30 @@
+#!/usr/bin/env node
 
 'use strict';
 
-const aws = require('aws-sdk');
+const AWS = require('aws-sdk');
 const f = require('./index');
+
+AWS.config.update({region: 'us-west-1'});
+
+let timestamp = (new Date(2016, 9, 13, 1, 2, 3)).getTime().toString();
 
 let message = {
   "Records": [
     {
+      "EventSource" : "aws:sns",
       "Sns": {
-        "Type": "Notification",
-        "MessageId": "123456",
-        "Subject": "subject",
-        "Message": "payload lives here",
-        "Timestamp": "2016-09-18T22:26:02.419Z",
-        "MessageAttributes": {}
+        "Message": timestamp
+      }
+    },
+    {
+      "eventSource" : "aws:kinesis",
+      "kinesis" : {
+        "data" : new Buffer(timestamp, 'ascii').toString('base64')
       }
     }
   ]
-}
+};
 
 let context = {
   fail : function _fail(message) {

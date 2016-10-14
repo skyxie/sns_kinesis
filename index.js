@@ -1,54 +1,10 @@
 'use strict';
 
-const async = require('async');
+const Promise = require('promise');
 const AWS = require('aws-sdk');
 
-function _write(kinesis, record, callback) {
-  let id = record.Sns.MessageId;
-  let data = JSON.stringify(record.Sns, null, 2);
-
-  var recordParams = {
-    Data : data,
-    PartitionKey : id,
-    StreamName : 'test'
-  };
-
-  console.log(data);
-
-  kinesis.putRecord(recordParams, function(err, data) {
-    if (err) {
-      console.log('ERROR: '+err);
-      callback(err);
-    } else {
-      console.log('Successfully sent data to Kinesis.');
-      console.log(data);
-      callback();
-    }
-  });
-}
-
-// Sends SNS messages to Kinesis
-function snsKinesis(event, context) {
-  const kinesis = new AWS.Kinesis({region : 'us-east-1'});
-
-  Async.parallel(
-    // Create a task for each record
-    event.Records.map((record) => {
-      // Write each record to kinesis
-      return (recordCb) => _write(kinesis, record, recordCb);
-    }),
-    (err, result) => {
-      if (err) {
-        context.fail(err);
-      } else {
-        context.succeed();
-      }
-    }
-  );
-}
-
 // Creates AWS Cloudwatch metrics
-function createMetricTask(cloudwatch, stats) {
+function createMetricPromise(cloudwatch, stats) {
   let params = {
     MetricData: [
       {
@@ -62,17 +18,19 @@ function createMetricTask(cloudwatch, stats) {
     Namespace: 'Lambda'
   };
 
-  return  function _createMetric(callback) {
-    cloudwatch.putMetricData(params, (err, result) => {
+  let promise = new Promise(function _putMetric(fulfill, reject) {
+    cloudwatch.putMetricData(params, function _putMetricCb(err, result) {
       if (err) {
         console.log('Failed to record stats: '+JSON.stringify(params, null, 2)+' because of error: '+err);
+        reject(err);
       } else {
         console.log('Successfully recorded stats: '+JSON.stringify(params, null, 2));
+        fulfill(result);
       }
-      // Do not error on failure to record stats;
-      callback(null, result);
     });
-  };
+  });
+
+  return promise;
 }
 
 function recordMetric(invoked, record) {
@@ -102,22 +60,31 @@ function recordMetric(invoked, record) {
     ' with latency '+latency+"ms"
   );
 
-  return {source: src, created_at: created, invoked_at: invoked, latency: latency};
+  return {
+    source: src,
+    created_at: created,
+    invoked_at: invoked,
+    latency: latency
+  };
 }
 
 // Measure time between message published to SNS and time invoked on lambda
 function main(event, context, callback) {
   let invoked = new Date();
   let cloudwatch = new AWS.CloudWatch();
-  let tasks = event.Records.map(function _recordIterator(record, index) {
-                return createMetricTask(cloudwatch, recordMetric(invoked, record));
-              });
 
-  async.parallel(tasks, (err, results) => {
-    // Always call with success
-    context.succeed();
-    callback();
-  });
+  Promise.all(event.Records.map(function _recordIterator(record) {
+    return createMetricPromise(cloudwatch, recordMetric(invoked, record));
+  })).done(
+    function _success(results) {
+      console.log("Invocation latency metric logging successful");
+      context.succeed();
+    },
+    function _failure(err) {
+      console.log("Invocation latency metric logging failed");
+      context.fail();
+    }
+  );
 }
 
 exports.handler = main;
